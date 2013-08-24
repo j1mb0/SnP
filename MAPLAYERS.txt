@@ -1,0 +1,27 @@
+//for the grass and stuff
+baseLayer
+    
+//adding another layer of
+// terrain
+firstLayer
+
+//hills and water n big trees
+//these won't be modified ever
+//it does contain the base, and
+//is used to check base location
+secondLayer 
+    
+//placeables
+//has SMALL trees
+placeableLayer 
+    
+//buttons will include
+1. wheat crop 2. corn crop 3. cherry tree
+4. ladybugs 5. protest  6. build base
+buttonLayer 
+
+//button frame layer
+buttonframes
+    
+//for highlight effect on mouseover
+highlightLayer 

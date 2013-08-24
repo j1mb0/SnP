@@ -1,0 +1,17 @@
+h1{
+	color:red;
+}
+
+.orange1-text{
+	color:black;
+	font-size:normal;
+}
+
+
+.orange3-text{
+	color:red;
+}
+
+#greeting.orange3-text{
+    font-size:100px;
+}

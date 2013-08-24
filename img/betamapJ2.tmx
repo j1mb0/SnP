@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="24" height="14" tilewidth="50" tileheight="50">
+ <tileset firstgid="1" name="betatextures" tilewidth="50" tileheight="50">
+  <image source="betatextures.png" width="1024" height="500"/>
+ </tileset>
+ <layer name="baseLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJyTY2BgkCMRtwBxK5GYVLNBeA0Qz8SB15JpJjY71qLhdVQyeyAwKE7a0MRWU9FsUNjPopHbZyDFL7ofqB3XQzmOBzNuoYIZM3GY28qASB/WVHJvK5q55JoPAPoRP4o=
+  </data>
+ </layer>
+ <layer name="firstLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYKAf6ATiTVQwpw8JYwOU2tFLwHxKAa3NpxfoROOrAbE6EKsAsSoSnxwgD8Rz0MSsgNgSimdCsTWZ5uMDa4B4LdT8WTQwH9medTQ0nxKQj0WMUJxSEt8gAEpPoDjGFadWROjHB2Bph5A5pAAAk2kSqw==
+  </data>
+ </layer>
+ <layer name="secondLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJyt0j1uwkAQhuE5BRFUJCUIGki4AZAgwQH4yRXy0xM6EKYK6UAgKIDa5oC8lr1iZAlsx7vSU7jYb7wzMxaRH0zgYYuFZD85POAXS/zhEU+WapRQjuQ/4wWNsIZjoY7Of8UbOnAl6NfZYv4QI7xnzNxhH9L5n/jC9417c0nesylmkfy4s5FgLknmv0IxZb6r8uNq1FCP5HfRS1DDk/jZt9CWdP9/7/iz0e/pY2Ax3/RO1/iwmK9rOHLdM52fR+Gf2WYfzXzMDhxwxAkVVNWdZop8fx/X6tu85QIQ2kD5
+  </data>
+ </layer>
+ <layer name="placeableLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYMAOOnFgdDX4+IQANjOxmUdIHbmAWmaSYw4pfkJXS4vwwBaX5MQnLdXTyyxS7CA1HklR04lHjJqAVvkL3Y7BZA4us3HFMS41APdXF40=
+  </data>
+ </layer>
+ <layer name="buttonLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFhMBWGpsvRGPz+Whs/lAH0jQ2X4bG5tfQ2PxGGps/lAEAFycCCg==
+  </data>
+ </layer>
+ <layer name="buttonframesLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFhIDsqPnDGgz18B/q5g9lAAAMMgDM
+  </data>
+ </layer>
+ <layer name="highlightLayer" width="24" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYBgFo2AUjIJRQA4AAAVAAAE=
+  </data>
+ </layer>
+</map>
