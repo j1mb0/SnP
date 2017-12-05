@@ -1,54 +1,38 @@
+<!DOCTYPE html>
 <html>
-	<body>
-            <audio id="click" preload>
-                <source src="click.mp3" type="audio/mpeg" />
-            </audio>
-            
-            <button onclick="document.getElementById('click').play()">
-            </button>
-            
-		 <canvas id="myCanvas" width ="1000" height="800" style="border: 1px solid black"> </canvas>
-		<script type= "text/javascript" src="classes.js"> </script>
+	<head>
 
+		<title> Real time multi-player games with HTML5</title>
 
+			<!-- Load style sheet -->
+		<link href="index.css" media="screen" rel="stylesheet" type="text/css">
 
-
-
-
-<div>
-    <audio src="nature003.mp3" controls="true" loop="true" autoplay="true"></audio>
-
-</div> 
-
-    <!--------------- AUDIO TAGS ----------->
-
-<audio id="click" preload>
-    <source src='AUDIO/click.mp3' type='audio/mp3' />
-</audio>
-
-    <audio id="birds" preload>
-    <source src='AUDIO/birds.mp3' type='audio/mp3' />
-</audio>
-
-<audio id="cash" preload>
-    <source src='AUDIO/cash.wav' type='audio/wav' />
-</audio>
-
-    <audio id="mob" preload>
-    <source src='AUDIO/mob.wav' type='audio/wav' />
-</audio>
-        <audio id="construction" preload>
-    <source src='AUDIO/construction.wav' type='audio/wav' />
-</audio>
-
-               <audio id="winning" preload>
-    <source src='AUDIO/winning.wav' type='audio/wav' />
-</audio>
-
-               <audio id="moo" preload>
-    <source src='AUDIO/moo.wav' type='audio/wav' />
-</audio>
-  
+	<!-- Library code -->
 		
+		 	<!-- Load socket.io client side contents. -->
+		<script src="/socket.io/socket.io.js"></script>
+
+
+	 		<!-- Load the GUI rendering library code. -->
+		<script type="text/javascript" src="lib/dat.gui.min.js"></script>
+	 	
+	<!-- Game code -->
+			<!-- Load some custom data types-->
+		<script type="text/javascript" src="snp.types.js"></script>
+			<!-- Load the game map code. -->
+		<script type="text/javascript" src="snp.map.js"></script>
+			<!-- Load the game player code. -->
+		<script type="text/javascript" src="snp.player.js"></script>
+			<!-- Load the common game code. -->
+		<script type="text/javascript" src="snp.core.js"></script>
+			<!-- Finally, Load the game client code. -->
+		<script type="text/javascript" src="client.js"></script>		
+
+	</head>
+
+	<body>
+		<canvas id="viewport">
+		</canvas>
 	</body>
+
 </html>

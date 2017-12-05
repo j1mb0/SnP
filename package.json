@@ -1,0 +1,15 @@
+{
+  "name": "SprayNPray",
+  "author": "James Schiffer",
+  "description": "Web-based multiplayer game for CS494",
+  "license": "MIT",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "^3.21.2",
+    "node-uuid": "^1.4.8",
+    "socket.io": "^0.9.19"
+  },
+  "engine": {
+    "node": "0.10.x"
+  }
+}

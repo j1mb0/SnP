@@ -56,7 +56,7 @@ var atlasTiles = {
 //this is a function, but it's only purpose is to made 
 //2d arrays, so it's here. 
 //!!!! TRY TO FIND A BETTER PLACE FOR THIS
-function make2d(){
+function make2d(){kj
         var layer = new Array(gridHeight);
         for (var j = 0; j < gridHeight; j++) {
             layer[j] = new Array(gridWidth);
@@ -327,7 +327,6 @@ function aPlayer(crop1,crop2,crop3,isEnemy){
         var i = theTile.row;
         var j = theTile.column;
         
-        
         if(theMap.placeableLayer[j][i] === this.crop1.harvID)
         {
             theCrops.cropYield(crop1, this, false);
@@ -357,7 +356,7 @@ theAI.speed = 200;
 
 
 //****************************PLAYER DRIVER SIMPLETON***********************/
-//a collection of functiosn to be preformed upon players, ai or human.
+//a collection of functions to be preformed upon players, ai or human.
 var PlayerDriver = {
     
     isPBase: function(row, column, player){
@@ -392,10 +391,7 @@ var PlayerDriver = {
             
         var check = (theCrops.canGrowCrops(row, column, player) && player.money >= crop.cost);
         
-        if(check){
-
-            
-            
+        if(check){    
             PlayerDriver.plant(row, column, player, crop);
             
         } else if(theMap.placeableLayer[column][row] === crop.harvID){
@@ -596,22 +592,6 @@ var theRasters = {
 
 //Since the JSON gives us a raster array of int values, we need to convert it into
  // a corresponding 2d array. 
-function parseRaster(theRaster, the2dArray){
-    //for going through the raster
-    var k = 0;
-    
-    //controls columns
-    for(var j = 0; j <= gridHeight - 1; j++){
-        
-        //controls rows
-        for(var i = 0; i <= gridWidth - 1 ; i++){
-            
-            //copies it over
-            the2dArray[j][i] = theRaster[k] - 1;
-            k++;
-        }
-    }    
-}
 
 //initializes a 2d array to -1, basically undrawable tiles
 function init2dArray(the2dArray){
@@ -626,8 +606,6 @@ function init2dArray(the2dArray){
         }
     }
 }
-
-
 
 //this function will render the map.
 function render(){
@@ -969,22 +947,6 @@ var Protest = {
   //the crops and their functions
   var theCrops = {
       
-      //when harvesting up a crop, this happens
-      cropYield: function(crop, player, ladybug){
-          player.crops--;
-          
-          if(ladybug === false){
-              player.money += crop.payout;
-          }
-          else
-          {
-              player.money += crop.payout * 1.5;
-          }
-          
-          //console.log("Current Money: " + player.money);
-          
-      },
-      
       //when planting a crop, this happens
       cropPlant: function(crop, player){
           player.crops++;
@@ -1007,51 +969,48 @@ var Protest = {
           
           //check if there is a base or crop tile nearby
           if(check){
-              check = false;
-              
-              var j = column;
-              
-              
-              if(j >= 2){
-                  j -= 2;
-              }
-              
-              var jstart = j;
-              
-              var je = column;
-              
-              if(je < gridHeight - 2){
-                  je += 2;
-              }
-              
-              var i = row;
-              
-              if(i >= 2) {
-                  i -= 2;
-              }
-              
-              var istart = i;
-              
-              
-              var ie = row;
-              if(ie < gridWidth - 2){
-                  ie += 2;
-              }
-              
-              
-              for(j = jstart; j <= je; j++){
-                  for(i = istart; i <= ie; i++){
-                      
-                     if(PlayerDriver.isPBase(i, j, player)){
-                          check = true;
-                      }                
-                  }
-                 
-              }
-          }
-          
-          return check;
-      },
+            check = false;
+            
+            var j = column;
+            if(j >= 2)
+            {
+                j -= 2;
+            }
+            
+            var jstart = j;
+            
+            var je = column;
+            if(je < gridHeight - 2)
+            {
+                je += 2;
+            }
+            
+            var i = row;              
+            if(i >= 2) 
+            {
+                i -= 2;
+            }
+            
+            var istart = i;
+            var ie = row;
+            if(ie < gridWidth - 2)
+            {
+                ie += 2;
+            }
+            for(j = jstart; j <= je; j++)
+            {
+                for(i = istart; i <= ie; i++)
+                {                    
+                  if(PlayerDriver.isPBase(i, j, player))
+                  {
+                      check = true;
+                  }                
+                }
+            }
+        }
+        
+        return check;
+    },
       
       //will check to make sure that there was no growing crops
       //and that a tile is empty
@@ -1084,9 +1043,6 @@ var Protest = {
 function main(){
 
     render();
-    
-    
-    
     //find the location of the protest button
     protestBut.findLoc();
     
@@ -1102,13 +1058,12 @@ function main(){
     
     //redraws the map and updates
     //if(Game.start){
-        setInterval(Game.iterate, 100);
+    setInterval(Game.iterate, 100);
     //}
     
     //runs the Player AI
     setInterval(Game.run, thePlayer.speed);
 
-    
      //runs the enemy AI
      setInterval(Game.runEn, theAI.speed);
 }
