@@ -59,15 +59,15 @@ aPlayer.prototype.cashOut = function(crop){
 aPlayer.prototype.harvest = function(theTile){    
     if(theTile.tileType === this.crop1.harvID)
     {
-        this.money = this.crop1.payout;
+        this.money += this.crop1.payout;
     }
     else if(theTile.tileType === this.crop2.harvID)
     {
-        this.money = this.crop2.payout;
+        this.money += this.crop2.payout;
     }
     else if(theTile.tileType === this.crop3.harvID)
     {
-        this.money = this.crop3.payout;
+        this.money += this.crop3.payout;
     }
 };
 

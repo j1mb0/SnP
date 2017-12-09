@@ -37,7 +37,7 @@ aLayer.prototype.search = function(tileID){
         }
     }
     
-    return {row: loci, col: locj};
+    return {row: locj, col: loci};
 };
 
 //Sets all data in a layer to empty
@@ -160,7 +160,8 @@ game_map.prototype.canGrowCrops = function(row, column, baseId1, baseId2, baseId
     check = (this.secondLayer.data[row][column] === atlasTiles.empty);
     
     //checks that there is not a crop already there. 
-    check = (this.placeableLayer.data[row][column] === atlasTiles.empty);
+    check = (this.placeableLayer.data[row][column] === atlasTiles.empty
+            || this.placeableLayer.data[row][column] === atlasTiles.tree);
 
     //check if there is a base or crop tile nearby
     if(check){
@@ -170,7 +171,7 @@ game_map.prototype.canGrowCrops = function(row, column, baseId1, baseId2, baseId
         var jstart = column >= 2 ? column - 2 : column;                      // left-most column
         var je = column < (this.gridWidth - 2) ? column + 2 : column;  // right-most column
         
-        var istart = row >= 2 ? row - 2 : row;                               // highest row
+        var istart = row >= 2 && row <= this.gridWidth ? row - 2 : row;                               // highest row
         var ie = row < (this.gridHeight - 2) ? row + 2 : row;            // lowest row
 
         // look for the base

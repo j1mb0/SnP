@@ -3,10 +3,10 @@
 //everything would break when the atlas changes.
 var atlasTiles = {
     empty : -1, 
-    pBase1 : 25, pBase2: 26, pBase3: 45, pBase4: 46,
+    pBase1 : 24, pBase2: 25, pBase3: 44, pBase4: 45,
     hightlight: 6, seeds: 129, seedBut: 130, 
-    enBase1: 22, enBase2: 23,
-    enBase3: 42, enBase4: 43, wheat: 180, 
+    enBase1: 21, enBase2: 22,
+    enBase3: 41, enBase4: 42, wheat: 180, 
     wheatH: 183, protest: 27, 
     enWheat: 181, enWheatH: 182, tree: 136,
     wasted: 136, baseBut: 26, workerBut: 128,

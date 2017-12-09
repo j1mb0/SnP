@@ -57,16 +57,23 @@ function Button(game_instance, id, cost, duration){
     this.cost  = cost;
     this.duration = duration;
     this.isActive = false;
+    this.payX = 0;
+    this.payY = 0;
+    this.costX = 0;
+    this.costY = 0;
     
-    this.findLoc = function(buttonLayer){
-        var loc = buttonLayer.search(this.id);
-        this.row = loc.row;
-        this.column = loc.col;
-    };
-}
+};
 
-
-
+Button.prototype.findLoc = function(buttonLayer, tileWidth, tileHeight, leftOff, rightOff, upOff){
+    var loc = buttonLayer.search(this.id);
+    this.row = loc.row;
+    this.column = loc.col;
+    this.costX = (this.column * tileHeight) - leftOff; 
+    this.costY = (this.row  * tileWidth) + upOff ;  
+    
+    this.payX = (this.column   * tileHeight) + rightOff;
+    this.payY = (this.row  * tileWidth)  + upOff;
+};
         //Now the main game class. This gets created on
         //both server and client. Server creates one for
         //each game that is hosted, and client creates one
@@ -186,13 +193,13 @@ var game_core = function(game_instance){
     this.workerBut  = new Button(this, atlasTiles.workerBut,    75, 15000);
                    
     //find the location of the buttons
-    this.wheatBut.findLoc(this.snp_map.buttonLayer)  
-    this.cornBut.findLoc(this.snp_map.buttonLayer);
-    this.cherryBut.findLoc(this.snp_map.buttonLayer);
-    this.protestBut.findLoc(this.snp_map.buttonLayer);
-    this.ladybugBut.findLoc(this.snp_map.buttonLayer);
-    this.baseBut.findLoc(this.snp_map.buttonLayer);
-    this.workerBut.findLoc(this.snp_map.buttonLayer);
+    this.wheatBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);  
+    this.cornBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
+    this.cherryBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
+    this.protestBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
+    this.ladybugBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
+    this.baseBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
+    this.workerBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
     
 
         //Client specific initialisation
@@ -216,12 +223,12 @@ var game_core = function(game_instance){
         
         this.players = {
             self : new aPlayer(this, null, this.Wheat, this.Corn, this.Cherry, false),
-            other  : new aPlayer(this, null, this.EnWheat, this.EnCorn, this.EnCherry, true)
+            other  : new aPlayer(this, null, this.Wheat, this.Corn, this.Cherry, true)
         }
     } else { //if !server
         this.players = {
             playerA : new aPlayer(this, this.instance.player_host, this.Wheat, this.Corn, this.Cherry, false),
-            playerB : new aPlayer(this, this.instance.player_client, this.EnWheat, this.EnCorn, this.EnCherry, true)
+            playerB : new aPlayer(this, this.instance.player_client, this.Wheat, this.Corn, this.Cherry, true)
         }
         this.server_time = 0;
         this.laststateA = {};
@@ -377,6 +384,25 @@ game_core.prototype.stop_update = function() {  window.cancelAnimationFrame( thi
     are server_* so these have no prefix.
 
 */
+game_core.prototype.initializePlayer = function(player)
+{
+    if(player.host === false){
+        player.baseID1 = atlasTiles.enBase1;
+        player.baseID2 = atlasTiles.enBase2;
+        player.baseID3 = atlasTiles.enBase3;
+        player.baseID4 = atlasTiles.enBase4;
+
+        player.crop1 = this.EnWheat;
+        player.crop2 = this.EnCorn;
+        player.crop3 = this.EnCherry;
+        player.curCrop = player.crop1;
+    }
+    
+    baseLoc = this.snp_map.secondLayer.search(player.baseID1);
+    player.baseRow = baseLoc.row;
+    player.baseColumn = baseLoc.col;
+}
+
 
     //Main update loop
 game_core.prototype.update = function(t) {
@@ -500,9 +526,18 @@ game_core.prototype.server_update = function(){
         if(this.players.playerA.ready === true && this.players.playerB.ready === true){
             this.start = true;
             this.snp_map.highlightLayer.initialize();
+            if (this.players.playerA.instance.hosting === true){
+                this.players.playerA.host = true;
+            }
+            else {
+                this.players.playerB.host = true;
+            }
+            this.initializePlayer(this.players.playerA);
+            this.initializePlayer(this.players.playerB);            
         }
     } 
-    else if (this.players.playerA.inputs.length > 0) // we have some new updates to send to clients
+    
+    if (this.players.playerA.inputs.length > 0) // we have some new updates to send to clients
     {
         //Make a snapshot of the current state, for updating the clients
         var packetB = this.jsonifyUpdates(this.players.playerA);
@@ -861,6 +896,8 @@ game_core.prototype.client_update = function() {
         if(this.players.self.ready === true && this.players.other.ready === true){
             this.start = true;
             this.snp_map.highlightLayer.initialize();
+            this.initializePlayer(this.players.self);
+            this.initializePlayer(this.players.other);  
         }
     }
 
@@ -1020,8 +1057,8 @@ game_core.prototype.client_onreadygame = function(data) {
 
     var server_time = parseFloat(data.replace('-','.'));
 
-    var player_host = this.players.self.host ?  this.players.self : this.players.other;
-    var player_client = this.players.self.host ?  this.players.other : this.players.self;
+    var player_host = this.players.self.host === true ?  this.players.self : this.players.other;
+    var player_client = this.players.self.host === false  ?  this.players.other : this.players.self;
 
     this.local_time = server_time + this.net_latency;
     console.log('server time is about ' + this.local_time);
@@ -1038,24 +1075,9 @@ game_core.prototype.client_onjoingame = function(data) {
 
         //We are not the host
     this.players.self.host = false;
+    this.players.other.host = true;
         //Update the local state
     this.players.self.state = 'connected.joined.waiting';
-
-    this.players.self.baseID1 = atlasTiles.enBase1;
-    this.players.self.baseID2 = atlasTiles.enBase2;
-    this.players.self.baseID3 = atlasTiles.enBase3;
-    this.players.self.baseID4 = atlasTiles.enBase4;
-
-    this.players.self.crop1.growID = atlasTiles.enWheat;
-    this.players.self.crop1.harvID = atlasTiles.enWheatH;
-    this.players.self.crop2.growID = atlasTiles.enCorn;
-    this.players.self.crop2.harvID = atlasTiles.enCornH;
-    this.players.self.crop3.growID = atlasTiles.enCherry;
-    this.players.self.crop3.harvID = atlasTiles.enCherryH;
-    
-    baseLoc = this.snp_map.secondLayer.search(this.players.self.baseID1);
-    this.players.self.baseRow = baseLoc.row;
-    this.players.self.baseColumn = baseLoc.col;
 
 }; //client_onjoingame
 
@@ -1070,15 +1092,12 @@ game_core.prototype.client_onhostgame = function(data) {
 
         //Set the flag that we are hosting, this helps us position respawns correctly
     this.players.self.host = true;
+    this.players.other.host = false;
 
         //Update debugging information to display state
     this.players.self.state = 'hosting.waiting for a player';
     this.players.self.info_color = '#cc0000';
 
-    // make sure we are starting in the right location
-    baseLoc = this.snp_map.secondLayer.search(this.players.self.baseID1);
-    this.players.self.baseRow = baseLoc.row;
-    this.players.self.baseColumn = baseLoc.col;
 }; //client_onhostgame
 
 game_core.prototype.client_onconnected = function(data) {
@@ -1145,6 +1164,7 @@ game_core.prototype.client_ondisconnect = function(data) {
 
     this.players.self.state = 'not-connected';
     this.players.self.online = false;
+    this.start = false;
 
     this.players.other.state = 'not-connected';
 
@@ -1200,26 +1220,9 @@ game_core.prototype.client_draw_info = function() {
     
     //the game hasn't started yet
     
-    if(this.start === false && this.players.self.state == "not connected"){
-        this.ctx.fillText("Waiting for Player2", (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
+    if(this.start === false){
+        this.ctx.fillText(this.players.self.state, (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
     }
-
-    if(this.start === false && this.players.self.state ==  'connected.joined.waiting'){
-        this.ctx.fillText("Waiting for Player1 to Ready", (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
-    }
-
-    if(this.start === false && this.players.self.state ==  'hosting.waiting for a player'){
-        this.ctx.fillText("Waiting for Player2 to Ready", (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
-    }
-
-    if(this.start === false && this.players.self.state ==  'connected'){
-        this.ctx.fillText("Click to Ready", (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
-    }
-    
-    if(this.start === false && this.players.self.state.includes("local_pos") && this.players.self.ready === false){
-        this.ctx.fillText("Click to Ready", (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
-    }
-
 
     //the game has been won
     if(this.won){
@@ -1233,21 +1236,21 @@ game_core.prototype.client_draw_info = function() {
         this.ctx.fillText("Refresh to play again.", (viewport.width / 2) - 20, (viewport.height / 2) + 20);
     }
 
-            
     this.ctx.fillText("You  $" + this.players.self.money, this.theMenu.moneyPos.x, this.theMenu.moneyPos.y);
     this.ctx.fillText("Them $" + this.players.other.money, this.theMenu.aiMoneyPos.x, this.theMenu.aiMoneyPos.y);
-    this.ctx.fillText("Cost",  (this.wheatBut.row  * this.tileWidth) - this.theMenu.leftOff, (this.wheatBut.column * this.tileHeight) - this.theMenu.upOff);
-    this.ctx.fillText("Pay",   (this.wheatBut.row  * this.tileWidth) + this.theMenu.rightOff, (this.wheatBut.column * this.tileHeight) - this.theMenu.upOff);
-    this.ctx.fillText(this.Wheat.cost,    (this.wheatBut.row  * this.tileWidth) - this.theMenu.leftOff,  (this.wheatBut.column   * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.Wheat.payout,  (this.wheatBut.row  * this.tileWidth) + this.theMenu.rightOff, (this.wheatBut.column   * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.Corn.cost,     (this.cornBut.row   * this.tileWidth) - this.theMenu.leftOff,  (this.cornBut.column    * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.Corn.payout,   (this.cornBut.row   * this.tileWidth) + this.theMenu.rightOff, (this.cornBut.column    * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.Cherry.cost,   (this.cherryBut.row * this.tileWidth) - this.theMenu.leftOff,  (this.cherryBut.column  * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.Cherry.payout, (this.cherryBut.row * this.tileWidth) + this.theMenu.rightOff, (this.cherryBut.column  * this.tileHeight)     + this.theMenu.upOff);
-    this.ctx.fillText(this.baseBut.cost,     (this.baseBut.row   * this.tileWidth) - this.theMenu.leftOff,  (this.baseBut.column    * this.tileHeight)  + this.theMenu.upOff);
-    this.ctx.fillText(this.protestBut.cost,  (this.protestBut.row* this.tileWidth) - this.theMenu.leftOff,  (this.protestBut.column * this.tileHeight)  + this.theMenu.upOff);
-    this.ctx.fillText(this.workerBut.cost,   (this.workerBut.row * this.tileWidth) - this.theMenu.leftOff,  (this.workerBut.column  * this.tileHeight)  + this.theMenu.upOff);
+    this.ctx.fillText("Cost",  (this.wheatBut.column * this.tileHeight)  - this.theMenu.leftOff, (this.wheatBut.row  * this.tileWidth) - this.theMenu.upOff); 
+    this.ctx.fillText("Pay",   (this.wheatBut.column * this.tileHeight) + this.theMenu.rightOff, (this.wheatBut.row  * this.tileWidth) - this.theMenu.upOff);
+    this.ctx.fillText(this.Wheat.cost,      this.wheatBut.costX,    this.wheatBut.costY);  
+    this.ctx.fillText(this.Wheat.payout,    this.wheatBut.payX,     this.wheatBut.payY);
+    this.ctx.fillText(this.Corn.cost,       this.cornBut.costX,     this.cornBut.costY);
+    this.ctx.fillText(this.Corn.payout,     this.cornBut.payX,      this.cornBut.payY); 
+    this.ctx.fillText(this.Cherry.cost,     this.cherryBut.costX,   this.cherryBut.costY);
+    this.ctx.fillText(this.Cherry.payout,   this.cherryBut.payX,    this.cherryBut.payY);
+    this.ctx.fillText(this.baseBut.cost,    this.baseBut.costX,     this.baseBut.costY);
+    this.ctx.fillText(this.protestBut.cost, this.protestBut.costX,  this.protestBut.cpstY);
+    this.ctx.fillText(this.workerBut.cost,  this.workerBut.costX,   this.workerBut.costY);     
     
+    this.ctx.fillText("YOU",  this.players.self.baseColumn * this.tileWidth, (this.players.self.baseRow * this.tileHeight) + this.theMenu.upOff);
         //They can hide the help with the debug GUI
     // if(this.show_help) {
 
