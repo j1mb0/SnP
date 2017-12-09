@@ -2,7 +2,7 @@
 
 
 /****************************PLAYER CLASS*************************/
-var aPlayer = function(game_instance, player_insance, isEnemy, crop1, crop2, crop3){
+var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEnemy){
     this.instance = player_insance;
     this.game = game_instance;
     this.state = "not connected";
@@ -53,27 +53,22 @@ aPlayer.prototype.cashOut = function(crop){
     //console.log("Current Money: " + player.money);   
 };
 
-aPlayer.prototype.getCrop = function(theTile){    
-    if(theTile.tileType === this.crop1.harvID)
-    {
-        theCrops.cropYield(crop1, this, false);
-    }
-    else if(theTile.tileType === this.crop2.harvID)
-    {
-        theCrops.cropYield(crop2, this, false);
-    }
-    else if(theTile.tileType === this.crop3.harvID)
-    {
-        theCrops.cropYield(crop3, this, false);
-    }
-};
  
 //that AI just loves harvesting,
 //cause it makes him money
-aPlayer.prototype.harvest = function(theTile, player){    
-    player.getCrop(theTile);
-    theMap.placeableLayer[theTile.column][theTile.row] = atlasTiles.empty;
-    mapDoes.clearID(theMap.idLayer[theTile.column][theTile.row]);
+aPlayer.prototype.harvest = function(theTile){    
+    if(theTile.tileType === this.crop1.harvID)
+    {
+        this.money = this.crop1.payout;
+    }
+    else if(theTile.tileType === this.crop2.harvID)
+    {
+        this.money = this.crop2.payout;
+    }
+    else if(theTile.tileType === this.crop3.harvID)
+    {
+        this.money = this.crop3.payout;
+    }
 };
 
 //plant a crop

@@ -71,6 +71,7 @@ var game_map = function(gridHeight,
     if( 'undefined' != typeof global ){
         require("./snp.types.js");
         aTile = global.aTile;
+        atlasTiles = global.atlasTiles;
     }
     //for the grass and stuff
      this.baseLayer = new aLayer(baseRaster, this.gridWidth, this.gridHeight);
@@ -117,14 +118,14 @@ game_map.prototype.generateID = function(theTile){
     theTile.tileID = Math.floor(Math.random()*10001);     
 };
 
-game_map.prototype.clearID = function(theTile){
-    this.idLayer[column][row].tileID = -1; 
-    this.idLayer[column][row].tileType = -1;
+game_map.prototype.clearID = function(row, column){
+    this.idLayer[row][column].tileID = atlasTiles.empty; 
+    this.idLayer[row][column].tileType = atlasTiles.empty;
 };
 
 game_map.prototype.isPBase = function(row, column, baseId1, baseId2, baseId3, baseId4){
     var check = false;
-    var id = this.secondLayer.data[column][row];
+    var id = this.secondLayer.data[row][column];
 
     if(id === baseId1)
     {
@@ -156,26 +157,26 @@ game_map.prototype.canGrowCrops = function(row, column, baseId1, baseId2, baseId
     var check = false;
     
     //check if you can place a crop on terrain
-    check = (this.secondLayer.data[column][row] === atlasTiles.empty);
+    check = (this.secondLayer.data[row][column] === atlasTiles.empty);
     
     //checks that there is not a crop already there. 
-    check = (this.placeableLayer.data[column][row] === atlasTiles.empty);
+    check = (this.placeableLayer.data[row][column] === atlasTiles.empty);
 
     //check if there is a base or crop tile nearby
     if(check){
         check = false;
         
         // get the kernel in which a base must be in
-        var j = column >= 2 ? column - 2 : column;                      // left-most column
-        var je = column < (this.gridHeight - 2) ? column + 2 : column;  // right-most column
+        var jstart = column >= 2 ? column - 2 : column;                      // left-most column
+        var je = column < (this.gridWidth - 2) ? column + 2 : column;  // right-most column
         
-        var i = row >= 2 ? row - 2 : row;                               // highest row
-        var ie = row < (this.gridWidth - 2) ? row + 2 : row;            // lowest row
+        var istart = row >= 2 ? row - 2 : row;                               // highest row
+        var ie = row < (this.gridHeight - 2) ? row + 2 : row;            // lowest row
 
         // look for the base
-        for(; j <= je; j++)
+        for(var i = istart; i <= ie; i++)   // row
         {
-            for(; i <= ie; i++)
+            for(var j = jstart; j <= je; j++)  // column 
             {                    
                 if(this.isPBase(i, j, baseId1, baseId2, baseId3, baseId4))
                 {
@@ -190,30 +191,32 @@ game_map.prototype.canGrowCrops = function(row, column, baseId1, baseId2, baseId
 };
 
 game_map.prototype.place = function(row, column, crop){
-    
-    this.placeableLayer.data[column][row] = crop.growID;
-    this.generateID(this.idLayer[column][row], crop);
-    var id = this.idLayer[column][row].tileID;
-    this.idLayer[column][row].tileType = crop.growID;
+    // we need to save some variables on the stack so the timeout functions
+    // can access them
+    placeLayer = this.placeableLayer;
+    tileLayer = this.idLayer;
+
+    placeLayer.data[row][column] = crop.growID;
+    this.generateID(tileLayer[row][column], crop);
+    var id = tileLayer[row][column].tileID;
+    tileLayer[row][column].tileType = crop.growID;
     setTimeout(function() {
-        this.placeableLayer.data[column][row] = crop.harvID;
-        this.idLayer[column][row].tileType = crop.harvID;
+        placeLayer.data[row][column] = crop.harvID;
+        tileLayer[row][column].tileType = crop.harvID;
         
-        setTimeout(function()
-        {    
-            if(this.idLayer[column][row].tileID === id){
+        setTimeout(function() {
+            if(tileLayer[row][column].tileID === id){
                 
-                this.placeableLayer.data[column][row] = atlasTiles.wasted;
-                this.idLayer[column][row].tileType = atlasTiles.empty;
-            }   
+                placeLayer.data[row][column] = atlasTiles.wasted;
+                tileLayer[row][column].tileType = atlasTiles.empty;
+            }
         }, crop.wastePeriod);
-    
     }, crop.payoutPeriod);
-}
+};
 
 game_map.prototype.remove = function(row, column){
     this.clearID(row, column);
-    this.placeableLayer.data[column][row] = atlasTiles.empty;
+    this.placeableLayer.data[row][column] = atlasTiles.empty;
 }
 
 //server side we set the 'game_map' class to a global type, so that it can use it anywhere.

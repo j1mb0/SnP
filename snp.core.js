@@ -261,8 +261,8 @@ game_core.prototype.jsonifyUpdates = function(player){
 game_core.prototype.getRowCol = function (x, y){
     
     //get row
-    var row = x / this.tileWidth;
-    var column = y / this.tileHeight;
+    var row = y / this.tileWidth;
+    var column = x / this.tileHeight;
     
     //round it down
     row = Math.floor(row);
@@ -325,20 +325,20 @@ game_core.prototype.BuildBase = {
         var check = BuildBase.checkLoc(row, column);
         
         if(check){
-            this.snp_map.secondLayer.data[column][row] = atlasTiles.pBase1;
-            this.snp_map.placeableLayer.data[column][row] = atlasTiles.empty;
+            this.snp_map.secondLayer.data[row][column] = atlasTiles.pBase1;
+            this.snp_map.placeableLayer.data[row][column] = atlasTiles.empty;
             
-            this.snp_map.secondLayer.data[column][row + 1] = atlasTiles.pBase2;
-            this.snp_map.placeableLayer.data[column][row + 1] = atlasTiles.empty;
+            this.snp_map.secondLayer.data[row + 1][column] = atlasTiles.pBase2;
+            this.snp_map.placeableLayer.data[row + 1][column] = atlasTiles.empty;
             
-            this.snp_map.secondLayer.data[column + 1][row] = atlasTiles.pBase3;
-            this.snp_map.placeableLayer.data[column + 1][row] = atlasTiles.empty;
+            this.snp_map.secondLayer.data[row][column + 1] = atlasTiles.pBase3;
+            this.snp_map.placeableLayer.data[row][column + 1] = atlasTiles.empty;
             
-            this.snp_map.secondLayer.data[column + 1][row + 1] = atlasTiles.pBase4;
-            this.snp_map.placeableLayer.data[column + 1][row + 1] = atlasTiles.empty;
+            this.snp_map.secondLayer.data[row + 1][column + 1] = atlasTiles.pBase4;
+            this.snp_map.placeableLayer.data[row + 1][column + 1] = atlasTiles.empty;
             
             baseBut.isActive = false;
-            this.snp_map.highlightLayer.data[baseBut.column][baseBut.row] = atlasTiles.empty;
+            this.snp_map.highlightLayer.data[baseBut.row][baseBut.column] = atlasTiles.empty;
             thePlayer.money -= baseBut.cost;
         }
     }
@@ -353,13 +353,13 @@ game_core.prototype.worker = {
         
         thePlayer.money -= workerBut.cost;
         
-        this.snp_map.highlightLayer.data[this.workerBut.column][this.workerBut.row] = atlasTiles.hightlight;
+        this.snp_map.highlightLayer.data[this.workerBut.row][this.workerBut.column] = atlasTiles.hightlight;
         
         thePlayer.canWork = true;
         
         setTimeout(function() {
             thePlayer.canWork = false;
-            this.snp_map.highlightLayer.data[this.workerBut.column][this.workerBut.row] = atlasTiles.empty;        
+            this.snp_map.highlightLayer.data[this.workerBut.row][this.workerBut.column] = atlasTiles.empty;        
         }, this.workerBut.duration);
     }
 };
@@ -434,7 +434,7 @@ game_core.prototype.process_input = function( player ) {
             //check if a button was pressed or not
         var butPress = this.clickButton(update.row, update.col);
 
-        if(butPress || !update.col || !update.row){
+        if(butPress){
             //why is this empty? I forget
             //clickButton will return true if the base button was clicked
             // so we don't process the input if a button was pressed, click button does all of that
@@ -454,10 +454,9 @@ game_core.prototype.process_input = function( player ) {
                 player.plant();
             }
             else { // try to harvest
-                if (player.canHarvest(this.snp_map.idLayer[update.col][update.row].tileType)){
-                    
+                if (player.canHarvest(this.snp_map.idLayer[update.row][update.col].tileType)){
+                    player.harvest(this.snp_map.idLayer[update.row][update.col]);
                     this.snp_map.remove(update.row, update.col);
-                    player.harvest(this.snp_map.idLayer[update.col, update.row]);
                 }
             }  
         } //for each input command
@@ -502,10 +501,8 @@ game_core.prototype.server_update = function(){
             this.start = true;
             this.snp_map.highlightLayer.initialize();
         }
-    }
-
-    // we have some new updates to send to clients
-    if (this.players.playerA.inputs.length > 0)
+    } 
+    else if (this.players.playerA.inputs.length > 0) // we have some new updates to send to clients
     {
         //Make a snapshot of the current state, for updating the clients
         var packetB = this.jsonifyUpdates(this.players.playerA);
