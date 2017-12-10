@@ -679,167 +679,6 @@ game_core.prototype.client_handle_input = function(){
 
 }; //game_core.client_handle_input
 
-
-game_core.prototype.client_process_net_prediction_correction = function() {
-    
-        //No updates...
-    if(!this.server_updates.length) return;
-
-        //The most recent server update
-    var latest_server_data = this.server_updates[this.server_updates.length-1];
-
-        //Our latest server click
-    var my_latest_server_click = this.players.self.host ? latest_server_data.position : latest_server_data.position;
-
-        //Update the debug server position block
-    this.ghosts.server_pos_self.pos = this.pos(my_server_pos);
-
-            //here we handle our local input prediction ,
-            //by correcting it with the server and reconciling its differences
-
-        var my_last_input_on_server = this.players.self.host ? latest_server_data.his : latest_server_data.cis;
-        if(my_last_input_on_server) {
-                //The last input sequence index in my local input list
-            var lastinputseq_index = -1;
-                //Find this input in the list, and store the index
-            for(var i = 0; i < this.players.self.inputs.length; ++i) {
-                if(this.players.self.inputs[i].seq == my_last_input_on_server) {
-                    lastinputseq_index = i;
-                    break;
-                }
-            }
-
-                //Now we can crop the list of any updates we have already processed
-            if(lastinputseq_index != -1) {
-                //so we have now gotten an acknowledgement from the server that our inputs here have been accepted
-                //and that we can predict from this known position instead
-
-                    //remove the rest of the inputs we have confirmed on the server
-                var number_to_clear = Math.abs(lastinputseq_index - (-1));
-                this.players.self.inputs.splice(0, number_to_clear);
-                    //The player is now located at the new server position, authoritive server
-                this.players.self.cur_state.pos = this.pos(my_server_pos);
-                this.players.self.last_input_seq = lastinputseq_index;
-                    //Now we reapply all the inputs that we have locally that
-                    //the server hasn't yet confirmed. This will 'keep' our position the same,
-                    //but also confirm the server position at the same time.
-                this.client_update_physics();
-                this.client_update_local_position();
-
-            } // if(lastinputseq_index != -1)
-        } //if my_last_input_on_server
-
-}; //game_core.client_process_net_prediction_correction
-    
-
-game_core.prototype.client_process_net_updates = function() {
-
-        //No updates...
-    if(!this.server_updates.length) return;
-
-    //First : Find the position in the updates, on the timeline
-    //We call this current_time, then we find the past_pos and the target_pos using this,
-    //searching throught the server_updates array for current_time in between 2 other times.
-    // Then :  other player position = lerp ( past_pos, target_pos, current_time );
-
-        //Find the position in the timeline of updates we stored.
-    var current_time = this.client_time;
-    var count = this.server_updates.length-1;
-    var target = null;
-    var previous = null;
-
-        //We look from the 'oldest' updates, since the newest ones
-        //are at the end (list.length-1 for example). This will be expensive
-        //only when our time is not found on the timeline, since it will run all
-        //samples. Usually this iterates very little before breaking out with a target.
-    for(var i = 0; i < count; ++i) {
-
-        var point = this.server_updates[i];
-        var next_point = this.server_updates[i+1];
-
-            //Compare our point in time with the server times we have
-        if(current_time > point.t && current_time < next_point.t) {
-            target = next_point;
-            previous = point;
-            break;
-        }
-    }
-
-        //With no target we store the last known
-        //server position and move to that instead
-    if(!target) {
-        target = this.server_updates[0];
-        previous = this.server_updates[0];
-    }
-
-        //Now that we have a target and a previous destination,
-        //We can interpolate between then based on 'how far in between' we are.
-        //This is simple percentage maths, value/target = [0,1] range of numbers.
-        //lerp requires the 0,1 value to lerp to? thats the one.
-
-     if(target && previous) {
-
-        this.target_time = target.t;
-
-        var difference = this.target_time - current_time;
-        var max_difference = (target.t - previous.t).fixed(3);
-        var time_point = (difference/max_difference).fixed(3);
-
-            //Because we use the same target and previous in extreme cases
-            //It is possible to get incorrect values due to division by 0 difference
-            //and such. This is a safe guard and should probably not be here. lol.
-        if( isNaN(time_point) ) time_point = 0;
-        if(time_point == -Infinity) time_point = 0;
-        if(time_point == Infinity) time_point = 0;
-
-            //The most recent server update
-        //var latest_server_data = this.server_updates[ this.server_updates.length-1 ];
-
-            //These are the exact server positions from this tick, but only for the ghost
-        //var other_server_pos = this.players.self.host ? latest_server_data.cp : latest_server_data.hp;
-
-            //The other players positions in this timeline, behind us and in front of us
-        //var other_target_pos = this.players.self.host ? target.cp : target.hp;
-        //var other_past_pos = this.players.self.host ? previous.cp : previous.hp;
-
-            //update the dest block, this is a simple lerp
-            //to the target from the previous point in the server_updates buffer
-        //this.ghosts.server_pos_other.pos = this.pos(other_server_pos);
-        //this.ghosts.pos_other.pos = this.v_lerp(other_past_pos, other_target_pos, time_point);
-
-        if(this.client_smoothing) {
-            //this.players.other.pos = this.v_lerp( this.players.other.pos, this.ghosts.pos_other.pos, this._pdt*this.client_smooth);
-        } else {
-            //this.players.other.pos = this.pos(this.ghosts.pos_other.pos);
-        }
-
-            //Now, if not predicting client movement , we will maintain the local player position
-            //using the same method, smoothing the players information from the past.
-        if(!this.client_predict && !this.naive_approach) {
-
-                //These are the exact server positions from this tick, but only for the ghost
-            //var my_server_pos = this.players.self.host ? latest_server_data.hp : latest_server_data.cp;
-
-                //The other players positions in this timeline, behind us and in front of us
-            //var my_target_pos = this.players.self.host ? target.hp : target.cp;
-            //var my_past_pos = this.players.self.host ? previous.hp : previous.cp;
-
-                //Snap the ghost to the new server position
-            //this.ghosts.server_pos_self.pos = this.pos(my_server_pos);
-            //var local_target = this.v_lerp(my_past_pos, my_target_pos, time_point);
-
-                //Smoothly follow the destination position
-            if(this.client_smoothing) {
-                //this.players.self.pos = this.v_lerp( this.players.self.pos, local_target, this._pdt*this.client_smooth);
-            } else {
-                //this.players.self.pos = this.pos( local_target );
-            }
-        }
-
-    } //if target && previous
-
-}; //game_core.client_process_net_updates
-
 game_core.prototype.client_onserverupdate_recieved = function(data){
     
         //Parse the server data
@@ -859,28 +698,6 @@ game_core.prototype.client_onserverupdate_recieved = function(data){
     }
 
 }; //game_core.client_onserverupdate_recieved
-
-game_core.prototype.client_update_local_position = function(){
-
- if(this.client_predict) {
-
-            //Work out the time we have since we updated the state
-        var t = (this.local_time - this.players.self.state_time);
-
-            //Then store the states for clarity,
-        //var old_state = this.players.self.old_state.pos;
-        //var current_state = this.players.self.cur_state.pos;
-
-            //Make sure the visual position matches the states we have stored
-        //this.players.self.pos = this.v_add( old_state, this.v_mul_scalar( this.v_sub(current_state,old_state), t )  );
-        //this.players.self.pos = current_state;
-        
-            //We handle collision on client if predicting.
-        this.check_collision( this.players.self );
-
-    }  //if(this.client_predict)
-
-}; //game_core.prototype.client_update_local_position
 
 // client specific main update loop
 game_core.prototype.client_update = function() {
@@ -1030,28 +847,6 @@ game_core.prototype.client_create_debug_gui = function() {
         _netsettings.open();
 
 }; //game_core.client_create_debug_gui
-
-game_core.prototype.client_reset_positions = function() {
-
-    // var player_host = this.players.self.host ?  this.players.self : this.players.other;
-    // var player_client = this.players.self.host ?  this.players.other : this.players.self;
-
-    //     //Host always spawns at the top left.
-    // player_host.pos = { x:20,y:20 };
-    // player_client.pos = { x:500, y:200 };
-
-    //     //Make sure the local player physics is updated
-    // this.players.self.old_state.pos = this.pos(this.players.self.pos);
-    // this.players.self.pos = this.pos(this.players.self.pos);
-    // this.players.self.cur_state.pos = this.pos(this.players.self.pos);
-
-    //     //Position all debug view items to their owners position
-    // this.ghosts.server_pos_self.pos = this.pos(this.players.self.pos);
-
-    // this.ghosts.server_pos_other.pos = this.pos(this.players.other.pos);
-    // this.ghosts.pos_other.pos = this.pos(this.players.other.pos);
-
-}; //game_core.client_reset_positions
 
 game_core.prototype.client_onreadygame = function(data) {
 
@@ -1272,9 +1067,5 @@ game_core.prototype.client_draw_info = function() {
         this.ctx.fillText('YOU', this.players.self.baseRow , this.players.baseColumn);
 
     } //if we are the host
-
-
-        //Reset the style back to full white.
-    //this.ctx.fillStyle = 'rgba(255,255,255,1)';
 
 }; //game_core.client_draw_help
