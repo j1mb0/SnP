@@ -28,11 +28,8 @@ where it sends and recieves messages without using any of the parsing capabiliti
 with them. Basically we are sending Websocket frames that are so barebones they barely contain anything else
 except for our protocol header frame embedded in their payloads. 
 
-Read the article here : 
-http://buildnewgames.com/real-time-multiplayer/
-
 View the demo here :
-http://notes.underscorediscovery.com:4004/?debug
+http://68.66.233.10:4004/
 
 ## Getting started (Using npm package.json)
 * Get node.js
