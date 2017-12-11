@@ -198,7 +198,7 @@ var game_core = function(game_instance){
     this.Corn     = new Crop(20000, 20000, 250, 100,    atlasTiles.corn,    atlasTiles.cornH,      this.cornBut.row, this.cornBut.column);
     this.Cherry   = new Crop(30000, 10000, 500, 200,    atlasTiles.cherry,  atlasTiles.cherryH,    this.cherryBut.row, this.cherryBut.column);
     this.EnWheat  = new Crop(10000, 30000, 50,  25,     atlasTiles.enWheat, atlasTiles.enWheatH,   this.wheatBut.row, this.wheatBut.column);    
-    this.EnCorn   = new Crop(15000, 30000, 200, 75,     atlasTiles.enCorn,  atlasTiles.enCornH,    this.cornBut.row, this.cornBut.column);    
+    this.EnCorn   = new Crop(15000, 30000, 175, 75,     atlasTiles.enCorn,  atlasTiles.enCornH,    this.cornBut.row, this.cornBut.column);    
     this.EnCherry = new Crop(20000, 30000, 350, 150,    atlasTiles.enCherry,atlasTiles.enCherryH,  this.cherryBut.row, this.cherryBut.column);    
 
         //Client specific initialisation

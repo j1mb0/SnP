@@ -1,5 +1,8 @@
-
-
+/*  Copyright 2017 James "J1mb0" Schiffer
+    
+    written by : J1mb0
+    written for : CS494 Final Project
+*/
 
 /****************************PLAYER CLASS*************************/
 var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEnemy){
@@ -13,7 +16,7 @@ var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEne
     this.won = false;
     this.ready = false;
     
-    this.toWin = 500;
+    this.toWin = 5000;
     this.activeCrops = 0;
     this.money = 300;
     
@@ -41,7 +44,7 @@ var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEne
 aPlayer.prototype.initialize = function(crop1, crop2, crop3){
     this.won = false;
     
-    this.toWin = 500;
+    this.toWin = 5000;
     this.activeCrops = 0;
     this.money = 300;
     
