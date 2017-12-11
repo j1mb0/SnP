@@ -1,3 +1,9 @@
+/*  Copyright 2017 James "J1mb0" Schiffer
+    
+    written by : J1mb0
+    written for : CS494 Final Project
+*/
+
 var aLayer = function(theRaster, width, height)
 {
     this.width = width;

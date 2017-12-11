@@ -2,7 +2,6 @@
     
     written by : J1mb0
     written for : CS494 Final Project
-    Usage : node app.js
 */
 
 //The main update loop runs on requestAnimationFrame,
