@@ -27,13 +27,15 @@ function aTile(){
 }
 
 /*********************************CROPS CLASS********************************/
-function Crop(payoutPeriod, wastePeriod, payout, cost, growID, harvID){
+function Crop(payoutPeriod, wastePeriod, payout, cost, growID, harvID, buttonRow, buttonCol){
     this.payoutPeriod = payoutPeriod;
     this.payout = payout;
     this.wastePeriod = wastePeriod;
     this.cost = cost;
     this.growID = growID;
     this.harvID = harvID;
+    this.buttonRow = buttonRow;
+    this.buttonCol = buttonCol;
 }
 //server side we set the 'aPlayer' class to a global type, so that it can use it anywhere.
 if( 'undefined' != typeof global ) {

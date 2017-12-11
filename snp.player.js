@@ -13,7 +13,7 @@ var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEne
     this.won = false;
     this.ready = false;
     
-    this.toWin = 5000;
+    this.toWin = 500;
     this.activeCrops = 0;
     this.money = 300;
     
@@ -37,6 +37,27 @@ var aPlayer = function(game_instance, player_insance, crop1, crop2, crop3, isEne
     
     this.canWork = false;
 };
+
+aPlayer.prototype.initialize = function(crop1, crop2, crop3){
+    this.won = false;
+    
+    this.toWin = 500;
+    this.activeCrops = 0;
+    this.money = 300;
+    
+    this.baseID1 = atlasTiles.pBase1;
+    this.baseID2 = atlasTiles.pBase2;
+    this.baseID3 = atlasTiles.pBase3;
+    this.baseID4 = atlasTiles.pBase4;
+    
+    this.baseRow = -1;
+    this.baseColumn = -1;
+    this.crop1 = crop1;
+    this.crop2 = crop2;
+    this.crop3 = crop3;
+
+    this.curCrop = crop1;
+}
 
 //when harvesting up a crop, this happens
 aPlayer.prototype.cashOut = function(crop){

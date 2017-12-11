@@ -10,18 +10,20 @@
         UUID        = require('node-uuid'),
         verbose     = true;
 
-        //Since we are sharing code with the browser, we
-        //are going to include some values to handle that.
-        global.window = global.document = global;
-    
-        //Import shared game library code.
-        require('./snp.types.js');
-        require('./snp.map.js');
-        require('./snp.player.js');
-        require('./snp.core.js');
-        game_core = global.game_core;
-        //A simple wrapper for logging so we can toggle it,
-        //and augment it for clarity.
+    //Since we are sharing code with the browser, we
+    //are going to include some values to handle that.
+    global.window = global.document = global;
+
+    //Import shared game library code.
+    require('./snp.types.js');
+    require('./snp.map.js');
+    require('./snp.player.js');
+    require('./snp.protocol.js');
+    require('./snp.core.js');
+    snpProtocol = global.snpProtocol;
+    game_core = global.game_core;
+    //A simple wrapper for logging so we can toggle it,
+    //and augment it for clarity.
     snp_server.log = function() {
         if(verbose) console.log.apply(this,arguments);
     };
@@ -38,71 +40,63 @@
         snp_server._dte = new Date().getTime();
         snp_server.local_time += snp_server._dt/1000.0;
     }, 4);
-
-    snp_server.onMessage = function(client,message) {
-
-        if(this.fake_latency && message.split('.')[0].substr(0,1) == 'i') {
-
-            //store all input message
-            snp_server.messages.push({client:client, message:message});
-
-            setTimeout(function(){
-                if(snp_server.messages.length) {
-                    snp_server._onMessage( snp_server.messages[0].client, snp_server.messages[0].message );
-                    snp_server.messages.splice(0,1);
-                }
-            }.bind(this), this.fake_latency);
-
-        } else {
-            snp_server._onMessage(client, message);
-        }
-    };
     
-    snp_server._onMessage = function(client,message) {
+    snp_server.onMessage = function(client, data) {
+        var other_client = (client.game.player_host.userid == client.userid) 
+                           ? client.game.player_client : client.game.player_host;
 
-        //Cut the message up into sub components
-        var message_parts = message.split('.');
-        //The first is always the type of message
-        var message_type = message_parts[0];
-
-        var other_client =
-            (client.game.player_host.userid == client.userid) ?
-                client.game.player_client : client.game.player_host;
-
-        if(message_type == 'i') {
-                //Input handler will forward this
-            this.onInput(client, message_parts);
-        } else if(message_type == 'p') {
-            client.send('s.p.' + message_parts[1]);
-        } else if(message_type == 'c') {    //Client changed their color!
-            if(other_client)
-                other_client.send('s.c.' + message_parts[1]);
-        } else if(message_type == 'l') {    //A client is asking for lag simulation
-            this.fake_latency = parseFloat(message_parts[1]);
-        }
-
+        var msg = snpProtocol.parseMsg(data);
+    
+        // server has a very easy job when dealing with messages. Handle updates and ping messages
+        switch(msg.command) {
+            case snpProtocol.ping    :
+                client.send(snpProtocol.createMsg(snpProtocol.ping, msg.commanddata));
+                break;
+            case snpProtocol.update  :
+                this.onInput(client, msg.commanddata);
+                break;
+            case snpProtocol.end     :
+                // end marks the end of a game,  but not either player connections
+                // so find new games for both of the existing players
+                // this way there could be a new matchup - which is better than 
+                // getting stuck playing the same person over and over again
+                // but it would still be better if we updated this to include a game
+                // lobby where people could choose who to play
+                if(client.game != null){   // it is possible to get end messages when there is no game
+                    if (this.games[client.game.game_id] != null){   // it is also possible that the game has no game_id
+                        this.games[client.game.game_id].player_count--;
+                        this.findGame(client);
+        
+                        if(this.games[client.game.game_id].player_count <= 0){
+                            // and then destroy the current game instance
+                            delete this.games[client.game_id];
+                            this.game_count--;
+        
+                            this.log('game ' + client.game.game_id + ' removed. there are now ' + this.game_count + ' games' );    
+                        }
+                    }
+                }
+                break;
+            default:
+                console.log("client" + client.game.player_host.userid + " sent me a bad command: " + msg.command);
+        } //command           
     }; //game_server.onMessage
 
-    snp_server.onInput = function(client, parts) {
-        //The input commands come in like u-l,
-        //so we split them up into separate commands,
-        //and then update the players
-        var input_commands = parts[1].split('-');
-        var input_time = parts[2].replace('-','.');
-        var input_length = parseInt(parts[3]);
+    snp_server.onInput = function(client, updateData) {
+        updateMsg = snpProtocol.parseUpdateData(updateData);
         
         //the client should be in a game, so
         //we can tell that game to handle the input
         if(client && client.game && client.game.gamecore) {
-            client.game.gamecore.handle_server_input(client, input_commands, input_time, input_length);
+            client.game.gamecore.handle_server_input(client, updateMsg.updates, updateMsg.time, updateMsg.length);
         }
 
     }; //game_server.onInput
 
         //Define some required functions
     snp_server.createGame = function(player) {
-
-            //Create a new game instance
+       
+        //Create a new game instance
         var thegame = {
                 id : UUID(),                //generate a new id for the game
                 player_host:player,         //so we know who initiated the game
@@ -116,90 +110,79 @@
             //Keep track
         this.game_count++;
 
-            //Create a new game core instance, this actually runs the
-            //game code like collisions and such.
+        //Create a new game core instance, this actually runs the
+        //server side game code for correction purposes.
         thegame.gamecore = new game_core( thegame );
-            //Start updating the game loop on the server
+        //Start updating the game loop on the server
         thegame.gamecore.update( new Date().getTime() );
 
-            //tell the player that they are now the host
-            //s=server message, h=you are hosting
-
-        player.send('s.h.'+ String(thegame.gamecore.local_time).replace('.','-'));
+        //tell the player that they are now the host
+        player.send(snpProtocol.createMsg(snpProtocol.host, String(thegame.gamecore.local_time).replace('.','-')));
         console.log('server host at  ' + thegame.gamecore.local_time);
         player.game = thegame;
         player.hosting = true;
         
         this.log('player ' + player.userid + ' created a game with id ' + player.game.id);
 
-            //return it
         return thegame;
 
     }; //game_server.createGame
 
         //we are requesting to kill a game in progress.
     snp_server.endGame = function(gameid, userid) {
-
         var thegame = this.games[gameid];
 
         if(thegame) {
-
-                //stop the game updates immediate
+            //stop the game updates immediate
             thegame.gamecore.stop_update();
 
-                //if the game has two players, the one is leaving
+            //if the game has two players, then one is leaving
             if(thegame.player_count > 1) {
-
-                    //send the players the message the game is ending
+                //send the players the message the game is ending
                 if(userid == thegame.player_host.userid) {
-
-                        //the host left, oh snap. Lets try join another game
+                    //the host left
                     if(thegame.player_client) {
-                            //tell them the game is over
-                        thegame.player_client.send('s.e');
-                            //now look for/create a new game.
+                        //tell them the game is over
+                        thegame.player_client.send(snpProtocol.createMsg(snpProtocol.end));
+                        //now look for/create a new game.
                         this.findGame(thegame.player_client);
                     }
                     
                 } else {
-                        //the other player left, we were hosting
+                    //the other player left, notify host
                     if(thegame.player_host) {
-                            //tell the client the game is ended
-                        thegame.player_host.send('s.e');
-                            //i am no longer hosting, this game is going down
+                        //tell the client the game is ended
+                        thegame.player_host.send(snpProtocol.createMsg(snpProtocol.end));
+                        //since the game has finished, this player is no longer hosting
                         thegame.player_host.hosting = false;
-                            //now look for/create a new game.
+                        //now look for/create a new game.
                         this.findGame(thegame.player_host);
                     }
                 }
             }
-
             delete this.games[gameid];
             this.game_count--;
 
-            this.log('game removed. there are now ' + this.game_count + ' games' );
+            this.log('game ' + gameid + ' removed. there are now ' + this.game_count + ' games' );
 
         } else {
-            this.log('that game was not found!');
+            this.log('Could not end the game with ID: ' + gameid);
         }
 
     }; //game_server.endGame
 
     snp_server.startGame = function(game) {
-
-            //right so a game has 2 players and wants to begin
-            //the host already knows they are hosting,
-            //tell the other client they are joining a game
-            //s=server message, j=you are joining, send them the host id
-        game.player_client.send('s.j.' + game.player_host.userid);
+        //right so a game has 2 players and wants to begin
+        //the host already knows they are hosting,
+        //tell the other client they are joining a game
+        game.player_client.send(snpProtocol.createMsg(snpProtocol.join, game.player_host.userid));
         game.player_client.game = game;
 
-            //now we tell both that the game is ready to start
-            //clients will reset their positions in this case.
-        game.player_client.send('s.r.'+ String(game.gamecore.local_time).replace('.','-'));
-        game.player_host.send('s.r.'+ String(game.gamecore.local_time).replace('.','-'));
+        //tell both players that the game is ready to start
+        game.player_client.send(snpProtocol.createMsg(snpProtocol.ready, String(game.gamecore.local_time).replace('.','-')));
+        game.player_host.send(snpProtocol.createMsg(snpProtocol.ready, String(game.gamecore.local_time).replace('.','-')));
  
-            //set this flag, so that the update loop can run it.
+        //set this flag, so that the update loop can run it.
         game.active = true;
 
     }; //game_server.startGame

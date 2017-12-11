@@ -160,9 +160,11 @@ game_map.prototype.canGrowCrops = function(row, column, baseId1, baseId2, baseId
     check = (this.secondLayer.data[row][column] === atlasTiles.empty);
     
     //checks that there is not a crop already there. 
-    check = (this.placeableLayer.data[row][column] === atlasTiles.empty
-            || this.placeableLayer.data[row][column] === atlasTiles.tree);
-
+    if (check)
+    {
+        check = (this.placeableLayer.data[row][column] === atlasTiles.empty
+                || this.placeableLayer.data[row][column] === atlasTiles.tree);
+    }
     //check if there is a base or crop tile nearby
     if(check){
         check = false;
@@ -218,7 +220,11 @@ game_map.prototype.place = function(row, column, crop){
 game_map.prototype.remove = function(row, column){
     this.clearID(row, column);
     this.placeableLayer.data[row][column] = atlasTiles.empty;
-}
+};
+
+game_map.prototype.reInitLayer = function(layer, raster){
+    layer = new aLayer(raster, this.width, this.height);
+};
 
 //server side we set the 'game_map' class to a global type, so that it can use it anywhere.
 if( 'undefined' != typeof global ) {

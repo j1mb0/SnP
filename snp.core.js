@@ -74,11 +74,6 @@ Button.prototype.findLoc = function(buttonLayer, tileWidth, tileHeight, leftOff,
     this.payX = (this.column   * tileHeight) + rightOff;
     this.payY = (this.row  * tileWidth)  + upOff;
 };
-        //Now the main game class. This gets created on
-        //both server and client. Server creates one for
-        //each game that is hosted, and client creates one
-        //for itself to play the game.
-
 
 /*********************************************RASTERS CLASS***************************************/
 //I couldn't figure out json files, so I decided to parse the data myself
@@ -113,6 +108,11 @@ var theRasters = {
 
 };
 
+        //Now the main game class. This gets created on
+        //both server and client. Server creates one for
+        //each game that is hosted, and client creates one
+        //for itself to play the game.
+
 /* The game_core class */
 var game_core = function(game_instance){
     
@@ -124,10 +124,12 @@ var game_core = function(game_instance){
     if (this.server){    
         require('./snp.map.js');
         require('./snp.player.js');
+        require('./snp.protocol.js');
         game_map = global.game_map;
         aPlayer = global.aPlayer;
         Crop = global.Crop;
         atlasTiles = global.atlasTiles;
+        snpProtocol = global.snpProtocol;
     }
 
     this.tileHeight = 50;
@@ -146,8 +148,7 @@ var game_core = function(game_instance){
     };
     
     this.start = false;
-    this.won  = false;
-    this.lost = false;
+    this.game_over = false;
 
     //A local timer for precision on server and client
     this.local_time = 0.016;            //The local timer
@@ -169,13 +170,6 @@ var game_core = function(game_instance){
                                 theRasters.frameRaster,
                                 theRasters.highlightRaster);
     
-    this.Wheat    = new Crop(15000, 20000, 100, 50, atlasTiles.wheat, atlasTiles.wheatH);
-    this.Corn     = new Crop(20000, 20000, 100, 200, atlasTiles.corn, atlasTiles.cornH);
-    this.Cherry   = new Crop(30000, 10000, 200, 500, atlasTiles.cherry, atlasTiles.cherryH);
-    this.EnWheat  = new Crop(15000, 20000, 150, 25, atlasTiles.enWheat, atlasTiles.enWheatH);
-    this.EnCorn   = new Crop(20000, 20000, 100, 200, atlasTiles.enCorn, atlasTiles.enCornH);
-    this.EnCherry = new Crop(30000, 10000, 200, 500, atlasTiles.enCherry, atlasTiles.enCherryH);
-
     this.theMenu = {
         moneyPos: {x: 20, y: 40},
         aiMoneyPos: {x: 20, y: 80},
@@ -201,19 +195,22 @@ var game_core = function(game_instance){
     this.baseBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
     this.workerBut.findLoc(this.snp_map.buttonLayer, this.tileWidth, this.tileHeight, this.theMenu.leftOff, this.theMenu.rightOff, this.theMenu.upOff);
     
+    this.Wheat    = new Crop(15000, 20000, 100, 50,     atlasTiles.wheat,   atlasTiles.wheatH,     this.wheatBut.row, this.wheatBut.column);      
+    this.Corn     = new Crop(20000, 20000, 250, 100,    atlasTiles.corn,    atlasTiles.cornH,      this.cornBut.row, this.cornBut.column);
+    this.Cherry   = new Crop(30000, 10000, 500, 200,    atlasTiles.cherry,  atlasTiles.cherryH,    this.cherryBut.row, this.cherryBut.column);
+    this.EnWheat  = new Crop(10000, 30000, 50,  25,     atlasTiles.enWheat, atlasTiles.enWheatH,   this.wheatBut.row, this.wheatBut.column);    
+    this.EnCorn   = new Crop(15000, 30000, 200, 75,     atlasTiles.enCorn,  atlasTiles.enCornH,    this.cornBut.row, this.cornBut.column);    
+    this.EnCherry = new Crop(20000, 30000, 350, 150,    atlasTiles.enCherry,atlasTiles.enCherryH,  this.cherryBut.row, this.cherryBut.column);    
 
         //Client specific initialisation
-    if(!this.server) {        
+    if(!this.server) {   
+        
         //atlas image
         this.atlas = new Image();
         this.atlas.src="img/betatextures.png";
 
             //Create the default configuration settings
         this.client_create_configuration();
-
-            //A list of recent server updates we interpolate across
-            //This is the buffer that is the driving factor for our networking
-        this.server_updates = [];
 
             //Connect to the socket.io server!
         this.client_connect_to_server();
@@ -251,17 +248,17 @@ if( 'undefined' != typeof global ) {
 // (4.22208334636).fixed(n) will return fixed point value to n places, default n = 3
 Number.prototype.fixed = function(n) { n = n || 3; return parseFloat(this.toFixed(n)); };
 
-game_core.prototype.jsonifyUpdates = function(player){
+game_core.prototype.jsonifyUpdates = function(inputs){
     var jsonString = "";
-    for(var i = 0; i < player.inputs.length; i++){
-        update = player.inputs[i];
+    for(var i = 0; i < inputs.length; i++){
+        update = inputs[i];
         jsonString += JSON.stringify(update);
-        if(i != player.inputs.length - 1){
+        if(i != inputs.length - 1){
             jsonString += '-';
         } 
     }
     return jsonString;
-}
+};
 
 
 //gets a row and column from an x and y position
@@ -278,9 +275,6 @@ game_core.prototype.getRowCol = function (x, y){
     return {"row": row, "column": column};
 };
 
-game_core.prototype.findButtonLocation = function(buttonInstance){
-
-};
 /*************************************PROTEST BUTTON DRIVER SIMPLETON****************************/
 
 game_core.prototype.Protest = {
@@ -306,20 +300,19 @@ game_core.prototype.Protest = {
 /***************************BUTTON TO BUILD BASE SIMPLETON*********************/
 game_core.prototype.BuildBase = {
     
-    activate: function(){
+    activate: function(baseBut, map){
         baseBut.isActive = true;
-        var i = this.baseBut.row;
-        var j = this.baseBut.column;
+        var i = baseBut.row;
+        var j = baseBut.column;
         
-        this.snp_map.highlightLayer.data[j][i] = atlasTiles.hightlight;
+        map.highlightLayer.data[j][i] = atlasTiles.hightlight;
     },
     
-    checkLoc: function(row, column){
+    checkLoc: function(row, column, map){
         var check = true;
-        for(var j = column - 1; j <= column + 1; j++){
-            for(var i = row - 1; i <= row + 1; i++){
-                
-                if(this.snp_map.secondLayer.data[j][i] !== atlasTiles.empty)
+        for(var j = row; j <= row + 1; j++){
+            for(var i = column; i <= column + 1; i++){
+                if(map.secondLayer.data[j][i] !== atlasTiles.empty)
                 {
                     check = false;
                 }                
@@ -328,24 +321,24 @@ game_core.prototype.BuildBase = {
         return check;
     },
     
-    place: function(row, column){
-        var check = BuildBase.checkLoc(row, column);
+    place: function(row, column, baseBut, thePlayer, map){
+        var check = this.checkLoc(row, column, map);
         
         if(check){
-            this.snp_map.secondLayer.data[row][column] = atlasTiles.pBase1;
-            this.snp_map.placeableLayer.data[row][column] = atlasTiles.empty;
-            
-            this.snp_map.secondLayer.data[row + 1][column] = atlasTiles.pBase2;
-            this.snp_map.placeableLayer.data[row + 1][column] = atlasTiles.empty;
-            
-            this.snp_map.secondLayer.data[row][column + 1] = atlasTiles.pBase3;
-            this.snp_map.placeableLayer.data[row][column + 1] = atlasTiles.empty;
-            
-            this.snp_map.secondLayer.data[row + 1][column + 1] = atlasTiles.pBase4;
-            this.snp_map.placeableLayer.data[row + 1][column + 1] = atlasTiles.empty;
+            map.secondLayer.data[row][column] = thePlayer.baseID1;
+            map.placeableLayer.data[row][column] = atlasTiles.empty;
+        
+            map.secondLayer.data[row][column + 1] = thePlayer.baseID2;
+            map.placeableLayer.data[row][column + 1] = atlasTiles.empty;
+        
+            map.secondLayer.data[row + 1][column] = thePlayer.baseID3;
+            map.placeableLayer.data[row + 1][column] = atlasTiles.empty;
+        
+            map.secondLayer.data[row + 1][column + 1] = thePlayer.baseID4;
+            map.placeableLayer.data[row + 1][column + 1] = atlasTiles.empty;
             
             baseBut.isActive = false;
-            this.snp_map.highlightLayer.data[baseBut.row][baseBut.column] = atlasTiles.empty;
+            map.highlightLayer.data[baseBut.row][baseBut.column] = atlasTiles.empty;
             thePlayer.money -= baseBut.cost;
         }
     }
@@ -354,20 +347,20 @@ game_core.prototype.BuildBase = {
 /************************* WORKER BUTTON SIMPLETON ************************************/
 //activates player ai, basically hiring workers
 game_core.prototype.worker = {
-    activate: function(thePlayer){
+    activate: function(workerBut, thePlayer, map){
         var i = thePlayer.baseRow;
         var j = thePlayer.baseColumn;
         
-        thePlayer.money -= workerBut.cost;
+        //thePlayer.money -= workerBut.cost;
         
-        this.snp_map.highlightLayer.data[this.workerBut.row][this.workerBut.column] = atlasTiles.hightlight;
+        map.highlightLayer.data[workerBut.row][workerBut.column] = atlasTiles.hightlight;
         
-        thePlayer.canWork = true;
+        //thePlayer.canWork = true;
         
         setTimeout(function() {
             thePlayer.canWork = false;
-            this.snp_map.highlightLayer.data[this.workerBut.row][this.workerBut.column] = atlasTiles.empty;        
-        }, this.workerBut.duration);
+            map.highlightLayer.data[workerBut.row][workerBut.column] = atlasTiles.empty;        
+        }, workerBut.duration);
     }
 };
 
@@ -386,6 +379,7 @@ game_core.prototype.stop_update = function() {  window.cancelAnimationFrame( thi
 */
 game_core.prototype.initializePlayer = function(player)
 {
+    player.initialize(this.Wheat, this.Corn, this.Cherry);
     if(player.host === false){
         player.baseID1 = atlasTiles.enBase1;
         player.baseID2 = atlasTiles.enBase2;
@@ -429,17 +423,34 @@ game_core.prototype.update = function(t) {
 //this checks if a button was pressed
 game_core.prototype.clickButton = function(row, column, thePlayer){
     var check = false;
+    if(row === thePlayer.crop1.buttonRow && column === thePlayer.crop1.buttonCol){
+        thePlayer.curCrop = thePlayer.crop1;
+        check = true;
+    }
+    if(row === thePlayer.crop2.buttonRow && column === thePlayer.crop2.buttonCol){
+        thePlayer.curCrop = thePlayer.crop2;
+        check = true;
+    }
+    if(row === thePlayer.crop3.buttonRow && column === thePlayer.crop3.buttonCol){
+        thePlayer.curCrop = thePlayer.crop3;
+        check = true;
+    }
     if(row === this.protestBut.row && column === this.protestBut.column && thePlayer.money >= this.protestBut.cost)
     {
-        Protest.activate();
+        // uhoh, this function is shared between client and server, can't figure out which player is which
+        // var otherPlayer = (thePlayer.instance.userid == this.players.self.instance.userid) 
+        //                   ? this.players.other : ();
+        //this.Protest.activate(thePlayer);
+        check = true;
     }
     if(row === this.baseBut.row && column === this.baseBut.column && thePlayer.money >= this.baseBut.cost)
     {
-        BuildBase.activate();
+        this.BuildBase.activate(this.baseBut, this.snp_map);
         check = true;
     }
     if(row === this.workerBut.row && column === this.workerBut.column && thePlayer.money >= this.workerBut.cost){
-        worker.activate();
+        this.worker.activate(this.workerBut, thePlayer, this.snp_map);
+        check = true;
     }
     
     return check;
@@ -458,7 +469,7 @@ game_core.prototype.process_input = function( player ) {
         var update = player.inputs[i];
 
             //check if a button was pressed or not
-        var butPress = this.clickButton(update.row, update.col);
+        var butPress = this.clickButton(update.row, update.col, player);
 
         if(butPress){
             //why is this empty? I forget
@@ -468,7 +479,7 @@ game_core.prototype.process_input = function( player ) {
         else if(this.baseBut.isActive)
         {
             //if the base button is active, place a base
-            BuildBase.place(update.row, update.col);
+            this.BuildBase.place(update.row, update.col, this.baseBut, player, this.snp_map);
         } 
         else 
         {
@@ -496,8 +507,11 @@ game_core.prototype.update_status = function(thePlayer){
     //check if the game has been won or lost
     if(thePlayer.money >= thePlayer.toWin){
         thePlayer.won = true;
+        thePlayer.ready = false;
         this.start = false;
+        this.game_over = true;
         // reapply the original highlight layer (make backup at initialization and then switch to it)
+        this.snp_map.reInitLayer(this.snp_map.highlightLayer, theRasters.highlightRaster);
     }
 };
 
@@ -528,9 +542,11 @@ game_core.prototype.server_update = function(){
             this.snp_map.highlightLayer.initialize();
             if (this.players.playerA.instance.hosting === true){
                 this.players.playerA.host = true;
+                this.players.playerB.host = false;
             }
             else {
                 this.players.playerB.host = true;
+                this.players.playerA.host = false;
             }
             this.initializePlayer(this.players.playerA);
             this.initializePlayer(this.players.playerB);            
@@ -539,54 +555,44 @@ game_core.prototype.server_update = function(){
     
     if (this.players.playerA.inputs.length > 0) // we have some new updates to send to clients
     {
-        //Make a snapshot of the current state, for updating the clients
-        var packetB = this.jsonifyUpdates(this.players.playerA);
-        packetB += '.';
-        packetB += this.server_time.toFixed(3).replace('.','-') + '.';
-        packetB += this.players.playerA.inputs.length.toString();
-
-        //Send the snapshot to the 'host' player
+        //Make a snapshot of the current state for player A and make a packet out of it
+        var packetB = snpProtocol.createUpdateMsg(this.jsonifyUpdates(this.players.playerA.inputs), 
+                                                  this.server_time.toFixed(3).replace('.','-'), 
+                                                  this.players.playerA.inputs.length.toString());
+        //Send the snapshot to playerB
         if(this.players.playerB.instance) {
-            this.players.playerB.instance.emit( 'onserverupdate', packetB);
+            this.players.playerB.instance.send(packetB);
+            console.log('server sending to B(' + this.players.playerB.instance.userid + ')  : ' + packetB);
         }
-
-        console.log('server sending to B(' + this.players.playerB.instance.userid + ')  : ' + packetB);
-            // clear the updates
+        // clear the updates
         this.players.playerA.inputs = [];
     }
         
     if(this.players.playerB.inputs.length > 0)
     {
-        //Make a snapshot of the current state, for updating the clients
-        var packetA = this.jsonifyUpdates(this.players.playerB);
-        packetA += '.';
-        packetA += this.server_time.toFixed(3).replace('.','-') + '.';
-        packetA += this.players.playerB.inputs.length.toString();
-
-            //Send the snapshot to the 'client' player
+        //Make a snapshot of the current state for playber B and make a packet out of it
+        var packetA = snpProtocol.createUpdateMsg(this.jsonifyUpdates(this.players.playerB.inputs), 
+                                                  this.server_time.toFixed(3).replace('.','-'), 
+                                                  this.players.playerB.inputs.length.toString());
+        //Send the snapshot to playerA
         if(this.players.playerA.instance) {
-            this.players.playerA.instance.emit( 'onserverupdate', packetA );
+            this.players.playerA.instance.send(packetA);
+            console.log('server sending to A(' + this.players.playerA.instance.userid + ')  : ' + packetA);    
         }
-        console.log('server sending to A(' + this.players.playerA.instance.userid + ')  : ' + packetA);    
             // clear the updates
         this.players.playerB.inputs = [];
     }
-        
-
 }; //game_core.server_update
 
-
 game_core.prototype.handle_server_input = function(client, inputs, sendTime, numInputs) {
-
-    
     console.log('server recieved from ' + client.userid + ' : ' + inputs);
 
-        //Fetch which client this refers to out of the two
+    // Fetch which client this refers to out of the two
     var player_client =
         (client.userid == this.players.playerA.instance.userid) ?
             this.players.playerA : this.players.playerB;
 
-        //Store the input on the player instance for processing in the physics loop
+    // put each input command into the player's processing queue
     for(var i = 0; i < numInputs; i++){
         player_client.inputs.push(JSON.parse(inputs[i]));
     }
@@ -658,43 +664,26 @@ game_core.prototype.client_redraw_map = function (){
 };
 
 game_core.prototype.client_handle_input = function(){
-
-        //This takes input from the client and keeps a record,T
-        //It also sends the input information to the server immediately
-        //as it is pressed. It also tags each input with a sequence number.
     if(this.players.self.inputs.length) {
-
-            //Send the packet of information to the server.
-            //The input packets are labelled with an 'i' in front.
-        var server_packet = 'i.';
-        server_packet += this.jsonifyUpdates(this.players.self);
-        server_packet += '.';
-        server_packet += this.local_time.toFixed(3).replace('.','-') + '.';
-        server_packet += this.players.self.inputs.length.toString();
-
-            //Go
-        this.socket.send(  server_packet  );
-
+        //Send the packet of information to the server.
+        var server_packet = snpProtocol.createUpdateMsg(this.jsonifyUpdates(this.players.self.inputs),
+                                                        this.local_time.toFixed(3).replace('.','-'), 
+                                                        this.players.self.inputs.length.toString());
+        this.socket.send(server_packet);
     }
-
 }; //game_core.client_handle_input
 
 game_core.prototype.client_onserverupdate_recieved = function(data){
-    
-        //Parse the server data
-    data_parts = data.split('.')
-
-    var inputs = data_parts[0].split('-');
-    var time = data_parts[1].replace('-','.');
-    var length = parseInt(data_parts[2]);
+    //Parse the server data
+    updateMsg = snpProtocol.parseUpdateData(data);
     
         //Store the server time (this is offset by the latency in the network, by the time we get it)
-    this.server_time = parseFloat(time);
+    this.server_time = parseFloat(updateMsg.time);
         //Update our local offset time from the last server update
     this.client_time = this.server_time - (this.net_offset/1000);
 
-    for(var i = 0; i < length; i++){
-        this.players.other.inputs.push(JSON.parse(inputs[i]));
+    for(var i = 0; i < updateMsg.length; i++){
+        this.players.other.inputs.push(JSON.parse(updateMsg.updates[i]));
     }
 
 }; //game_core.client_onserverupdate_recieved
@@ -708,6 +697,12 @@ game_core.prototype.client_update = function() {
     this.process_input(this.players.other);
     this.process_input(this.players.self);
 
+    if (this.game_over == true)
+    {
+        this.players.self.ready = false;
+        this.players.other.ready = false;
+        this.socket.send(snpProtocol.end);
+    }
     // check if both players are ready
     if(this.start === false){
         if(this.players.self.ready === true && this.players.other.ready === true){
@@ -718,7 +713,13 @@ game_core.prototype.client_update = function() {
         }
     }
 
-        // draw the map
+    // unhighlight all crops
+    this.snp_map.highlightLayer.data[this.players.self.crop1.buttonRow][this.players.self.crop1.buttonCol] =  atlasTiles.empty;
+    this.snp_map.highlightLayer.data[this.players.self.crop2.buttonRow][this.players.self.crop2.buttonCol] =  atlasTiles.empty;
+    this.snp_map.highlightLayer.data[this.players.self.crop3.buttonRow][this.players.self.crop3.buttonCol] =  atlasTiles.empty;
+    // highlight the selected crop
+    this.snp_map.highlightLayer.data[this.players.self.curCrop.buttonRow][this.players.self.curCrop.buttonCol] =  atlasTiles.hightlight;
+    // draw the map
     this.client_redraw_map();
 
     //draw help/information if required
@@ -738,32 +739,18 @@ game_core.prototype.create_timer = function(){
     }.bind(this), 4);
 }
 
-
 game_core.prototype.client_create_ping_timer = function() {
-
-        //Set a ping timer to 1 second, to maintain the ping/latency between
-        //client and server and calculated roughly how our connection is doing
-
+    //Set a ping timer to 1 second, to keep our connection alive
+    //as well as keep an eye on connectivity
     setInterval(function(){
-
-        this.last_ping_time = new Date().getTime() - this.fake_lag;
-        this.socket.send('p.' + (this.last_ping_time) );
-
+        this.last_ping_time = new Date().getTime();
+        this.socket.send(snpProtocol.createMsg(snpProtocol.ping, this.last_ping_time));
     }.bind(this), 1000);
-    
 }; //game_core.client_create_ping_timer
-
 
 game_core.prototype.client_create_configuration = function() {
 
-    this.show_help = false;             //Whether or not to draw the help text
-    //this.naive_approach = false;        //Whether or not to use the naive approach
-    //this.show_server_pos = false;       //Whether or not to show the server position
-    //this.show_dest_pos = false;         //Whether or not to show the interpolation goal
-    //this.client_predict = true;         //Whether or not the client is predicting input
-    //this.input_seq = 0;                 //When predicting client inputs, we store the last input as a sequence number
-    //this.client_smoothing = true;       //Whether or not the client side prediction tries to smooth things out
-    //this.client_smooth = 25;            //amount of smoothing to apply to client update dest
+    this.show_help = false;        
 
     this.net_latency = 0.001;           //the latency between the client and the server (ping/2)
     this.net_ping = 0.001;              //The round trip time from here to the server,and back
@@ -790,70 +777,12 @@ game_core.prototype.client_create_configuration = function() {
 
 };//game_core.client_create_configuration
 
-game_core.prototype.client_create_debug_gui = function() {
-
-    this.gui = new dat.GUI();
-
-    var _playersettings = this.gui.addFolder('Your settings');
-
-        this.colorcontrol = _playersettings.addColor(this, 'color');
-
-            //We want to know when we change our color so we can tell
-            //the server to tell the other clients for us
-        this.colorcontrol.onChange(function(value) {
-            this.players.self.color = value;
-            localStorage.setItem('color', value);
-            this.socket.send('c.' + value);
-        }.bind(this));
-
-        _playersettings.open();
-
-    var _othersettings = this.gui.addFolder('Methods');
-
-        _othersettings.add(this, 'naive_approach').listen();
-        _othersettings.add(this, 'client_smoothing').listen();
-        _othersettings.add(this, 'client_smooth').listen();
-        _othersettings.add(this, 'client_predict').listen();
-
-    var _debugsettings = this.gui.addFolder('Debug view');
-        
-        _debugsettings.add(this, 'show_help').listen();
-        _debugsettings.add(this, 'fps_avg').listen();
-        _debugsettings.add(this, 'show_server_pos').listen();
-        _debugsettings.add(this, 'show_dest_pos').listen();
-        _debugsettings.add(this, 'local_time').listen();
-
-        _debugsettings.open();
-
-    var _consettings = this.gui.addFolder('Connection');
-        _consettings.add(this, 'net_latency').step(0.001).listen();
-        _consettings.add(this, 'net_ping').step(0.001).listen();
-
-            //When adding fake lag, we need to tell the server about it.
-        var lag_control = _consettings.add(this, 'fake_lag').step(0.001).listen();
-        lag_control.onChange(function(value){
-            this.socket.send('l.' + value);
-        }.bind(this));
-
-        _consettings.open();
-
-    var _netsettings = this.gui.addFolder('Networking');
-        
-        _netsettings.add(this, 'net_offset').min(0.01).step(0.001).listen();
-        _netsettings.add(this, 'server_time').step(0.001).listen();
-        _netsettings.add(this, 'client_time').step(0.001).listen();
-        //_netsettings.add(this, 'oldest_tick').step(0.001).listen();
-
-        _netsettings.open();
-
-}; //game_core.client_create_debug_gui
-
 game_core.prototype.client_onreadygame = function(data) {
 
     var server_time = parseFloat(data.replace('-','.'));
 
     var player_host = this.players.self.host === true ?  this.players.self : this.players.other;
-    var player_client = this.players.self.host === false  ?  this.players.other : this.players.self;
+    var player_client = this.players.other.host === true  ?  this.players.self : this.players.other;
 
     this.local_time = server_time + this.net_latency;
     console.log('server time is about ' + this.local_time);
@@ -861,9 +790,6 @@ game_core.prototype.client_onreadygame = function(data) {
         //Update their information
     player_host.state = 'local_pos(hosting)';
     player_client.state = 'local_pos(joined)';
-
-    this.players.self.state = 'YOU ' + this.players.self.state;
-
 }; //client_onreadygame
 
 game_core.prototype.client_onjoingame = function(data) {
@@ -873,11 +799,25 @@ game_core.prototype.client_onjoingame = function(data) {
     this.players.other.host = true;
         //Update the local state
     this.players.self.state = 'connected.joined.waiting';
+    this.game_over = false;
+    this.start = false;
+
+    // reset all data
+    // start making common game related data
+    this.snp_map = new game_map(this.gridHeight, 
+        this.gridWidth,
+        this.tileHeight,
+        theRasters.baseRaster,
+        theRasters.firstRaster,
+        theRasters.secondRaster,
+        theRasters.placeablesRaster,
+        theRasters.buttonRaster,
+        theRasters.frameRaster,
+        theRasters.highlightRaster);
 
 }; //client_onjoingame
 
 game_core.prototype.client_onhostgame = function(data) {
-
         //The server sends the time when asking us to host, but it should be a new game.
         //so the value will be really small anyway (15 or 16ms)
     var server_time = parseFloat(data.replace('-','.'));
@@ -893,121 +833,106 @@ game_core.prototype.client_onhostgame = function(data) {
     this.players.self.state = 'hosting.waiting for a player';
     this.players.self.info_color = '#cc0000';
 
+    this.game_over = false;
+    this.start = false;
+    
+    // reset all data
+    // start making common game related data
+    this.snp_map = new game_map(this.gridHeight, 
+        this.gridWidth,
+        this.tileHeight,
+        theRasters.baseRaster,
+        theRasters.firstRaster,
+        theRasters.secondRaster,
+        theRasters.placeablesRaster,
+        theRasters.buttonRaster,
+        theRasters.frameRaster,
+        theRasters.highlightRaster);
+
 }; //client_onhostgame
 
 game_core.prototype.client_onconnected = function(data) {
-
-        //The server responded that we are now in a game,
-        //this lets us store the information about ourselves and set the colors
-        //to show we are now ready to be playing.
-    this.players.self.id = data.id;
+    //The server responded that we are now in a game,
+    //this lets us store the information about ourselves and set the colors
+    //to show we are now ready to be playing.
+    this.players.self.id = data;
     this.players.self.state = 'connected';
     this.players.self.online = true;
 }; //client_onconnected
 
-game_core.prototype.client_on_otherclientcolorchange = function(data) {
-
-    this.players.other.color = data;
-
-}; //game_core.client_on_otherclientcolorchange
-
 game_core.prototype.client_onping = function(data) {
-
+    // we sent the time stored in data out
+    // so we really are measuring the time from the original write to the server response recieved
     this.net_ping = new Date().getTime() - parseFloat( data );
     this.net_latency = this.net_ping/2;
-
 }; //client_onping
+
+game_core.prototype.client_onendgame = function(){
+    game.start = false;    
+}
 
 game_core.prototype.client_onnetmessage = function(data) {
 
-    var commands = data.split('.');
-    var command = commands[0];
-    var subcommand = commands[1] || null;
-    var commanddata = commands[2] || null;
+    var msg = snpProtocol.parseMsg(data);
 
-    switch(command) {
-        case 's': //server message
-
-            switch(subcommand) {
-
-                case 'h' : //host a game requested
-                    this.client_onhostgame(commanddata); break;
-
-                case 'j' : //join a game requested
-                    this.client_onjoingame(commanddata); break;
-
-                case 'r' : //ready a game requested
-                    this.client_onreadygame(commanddata); break;
-
-                case 'e' : //end game requested
-                    this.client_ondisconnect(commanddata); break;
-
-                case 'p' : //server ping
-                    this.client_onping(commanddata); break;
-
-            } //subcommand
-
-        break; //'s'
-    } //command
-                
+    switch(msg.command) {
+        case snpProtocol.host    :
+            this.client_onhostgame(msg.commanddata);
+            break;
+        case snpProtocol.join    :
+            this.client_onjoingame(msg.commanddata);    
+            break;
+        case snpProtocol.ready   :
+            this.client_onreadygame(msg.commanddata); 
+            break;
+        case snpProtocol.end     :
+            this.client_ondisconnect(msg.commanddata);;
+            break;
+        case snpProtocol.ping    :
+            this.client_onping(msg.commanddata);
+            break;
+        case snpProtocol.update  :
+            this.client_onserverupdate_recieved(msg.commanddata);
+            break;
+        case snpProtocol.correct :
+            console.log("Correction command given by server");
+            break;
+        case snpProtocol.connect :
+            this.client_onconnected(msg.commanddata);
+            break;
+        default:
+            console.log("server sent me a bad command: " + command);
+    } //command           
 }; //client_onnetmessage
 
 game_core.prototype.client_ondisconnect = function(data) {
-    
-        //When we disconnect, we don't know if the other player is
-        //connected or not, and since we aren't, everything goes to offline
-
+    //When we disconnect, we don't know if the other player is
+    //connected or not, and since we aren't, everything goes to offline
     this.players.self.state = 'not-connected';
     this.players.self.online = false;
-    this.start = false;
-
     this.players.other.state = 'not-connected';
-
+    this.start = false;
+        
 }; //client_ondisconnect
 
 game_core.prototype.client_connect_to_server = function() {
-        
-            //Store a local reference to our connection to the server
-        this.socket = io.connect();
+    
+    //Store a local reference to our connection to the server
+    this.socket = io.connect();
+    //When we connect, we are not 'connected' until we have a server id
+    //and are placed in a game by the server. The server sends us a message for that
+    this.socket.on('connect', function() {
+        this.players.self.state = 'connecting';
+    }.bind(this));
 
-            //When we connect, we are not 'connected' until we have a server id
-            //and are placed in a game by the server. The server sends us a message for that.
-        this.socket.on('connect', function(){
-            this.players.self.state = 'connecting';
-        }.bind(this));
-
-            //Sent when we are disconnected (network, server down, etc)
-        this.socket.on('disconnect', this.client_ondisconnect.bind(this));
-            //Sent each tick of the server simulation. This is our authoritive update
-        this.socket.on('onserverupdate', this.client_onserverupdate_recieved.bind(this));
-            //Handle when we connect to the server, showing state and storing id's.
-        this.socket.on('onconnected', this.client_onconnected.bind(this));
-            //On error we just show that we are not connected for now. Can print the data.
-        this.socket.on('error', this.client_ondisconnect.bind(this));
-            //On message from the server, we parse the commands and send it to the handlers
-        this.socket.on('message', this.client_onnetmessage.bind(this));
-
+    //this.socket.on('timeout', this.client_ondisconnect.bind(this));
+    //Sent when we are disconnected (network, server down, etc)
+    this.socket.on('disconnect', this.client_ondisconnect.bind(this));
+    //On error we just show that we are not connected for now.
+    this.socket.on('error', this.client_ondisconnect.bind(this));
+    //On message from the server, we parse the commands and send it to the handlers
+    this.socket.on('message', this.client_onnetmessage.bind(this));
 }; //game_core.client_connect_to_server
-
-
-game_core.prototype.client_refresh_fps = function() {
-
-        //We store the fps for 10 frames, by adding it to this accumulator
-    this.fps = 1/this.dt;
-    this.fps_avg_acc += this.fps;
-    this.fps_avg_count++;
-
-        //When we reach 10 frames we work out the average fps
-    if(this.fps_avg_count >= 10) {
-
-        this.fps_avg = this.fps_avg_acc/10;
-        this.fps_avg_count = 1;
-        this.fps_avg_acc = this.fps;
-
-    } //reached 10 frames
-
-}; //game_core.client_refresh_fps
-
 
 game_core.prototype.client_draw_info = function() {
     this.ctx.font = '14pt Calibri';
@@ -1015,57 +940,44 @@ game_core.prototype.client_draw_info = function() {
     
     //the game hasn't started yet
     
-    if(this.start === false){
+    if(this.start === false && this.game_over == false){
         this.ctx.fillText(this.players.self.state, (this.viewport.width / 2) - 20, (this.viewport.height / 2) - 10);
     }
 
     //the game has been won
-    if(this.won){
+    if(this.players.self.won == true && this.game_over == true){
         this.ctx.fillText("You Won!", (viewport.width / 2) - 20 , (viewport.height / 2)) - 10;
-        this.ctx.fillText("Refresh to play again.", (viewport.width / 2) , (viewport.height / 2) + 20);
+        this.ctx.fillText("Joining another game.", (viewport.width / 2) , (viewport.height / 2) + 20);
+        this.ctx.fillText(this.players.self.state, (viewport.width / 2) , (viewport.height / 2) + 50);        
     }
     
     //the game has been lost
-    if(this.lost){
+    if(this.players.self.won == false && this.game_over == true){
         this.ctx.fillText("You Lost!", (viewport.width / 2) - 20 , (viewport.height / 2) - 10);
-        this.ctx.fillText("Refresh to play again.", (viewport.width / 2) - 20, (viewport.height / 2) + 20);
+        this.ctx.fillText("Joining another game.", (viewport.width / 2) - 20, (viewport.height / 2) + 20);
+        this.ctx.fillText(this.players.self.state, (viewport.width / 2) , (viewport.height / 2) + 50);
     }
 
     this.ctx.fillText("You  $" + this.players.self.money, this.theMenu.moneyPos.x, this.theMenu.moneyPos.y);
     this.ctx.fillText("Them $" + this.players.other.money, this.theMenu.aiMoneyPos.x, this.theMenu.aiMoneyPos.y);
     this.ctx.fillText("Cost",  (this.wheatBut.column * this.tileHeight)  - this.theMenu.leftOff, (this.wheatBut.row  * this.tileWidth) - this.theMenu.upOff); 
     this.ctx.fillText("Pay",   (this.wheatBut.column * this.tileHeight) + this.theMenu.rightOff, (this.wheatBut.row  * this.tileWidth) - this.theMenu.upOff);
-    this.ctx.fillText(this.Wheat.cost,      this.wheatBut.costX,    this.wheatBut.costY);  
-    this.ctx.fillText(this.Wheat.payout,    this.wheatBut.payX,     this.wheatBut.payY);
-    this.ctx.fillText(this.Corn.cost,       this.cornBut.costX,     this.cornBut.costY);
-    this.ctx.fillText(this.Corn.payout,     this.cornBut.payX,      this.cornBut.payY); 
-    this.ctx.fillText(this.Cherry.cost,     this.cherryBut.costX,   this.cherryBut.costY);
-    this.ctx.fillText(this.Cherry.payout,   this.cherryBut.payX,    this.cherryBut.payY);
+    this.ctx.fillText(this.players.self.crop1.cost,      this.wheatBut.costX,    this.wheatBut.costY);  
+    this.ctx.fillText(this.players.self.crop1.payout,    this.wheatBut.payX,     this.wheatBut.payY);
+    this.ctx.fillText(this.players.self.crop2.cost,      this.cornBut.costX,     this.cornBut.costY);
+    this.ctx.fillText(this.players.self.crop2.payout,    this.cornBut.payX,      this.cornBut.payY); 
+    this.ctx.fillText(this.players.self.crop3.cost,      this.cherryBut.costX,   this.cherryBut.costY);
+    this.ctx.fillText(this.players.self.crop3.payout,    this.cherryBut.payX,    this.cherryBut.payY);
     this.ctx.fillText(this.baseBut.cost,    this.baseBut.costX,     this.baseBut.costY);
     this.ctx.fillText(this.protestBut.cost, this.protestBut.costX,  this.protestBut.cpstY);
     this.ctx.fillText(this.workerBut.cost,  this.workerBut.costX,   this.workerBut.costY);     
     
     this.ctx.fillText("YOU",  this.players.self.baseColumn * this.tileWidth, (this.players.self.baseRow * this.tileHeight) + this.theMenu.upOff);
-        //They can hide the help with the debug GUI
-    // if(this.show_help) {
 
-    //     this.ctx.fillText('net_offset : local offset of others players and their server updates. Players are net_offset "in the past" so we can smoothly draw them interpolated.', 10 , 30);
-    //     this.ctx.fillText('server_time : last known game time on server', 10 , 70);
-    //     this.ctx.fillText('client_time : delayed game time on client for other players only (includes the net_offset)', 10 , 90);
-    //     this.ctx.fillText('net_latency : Time from you to the server. ', 10 , 130);
-    //     this.ctx.fillText('net_ping : Time from you to the server and back. ', 10 , 150);
-    //     this.ctx.fillText('fake_lag : Add fake ping/lag for testing, applies only to your inputs (watch server_pos block!). ', 10 , 170);
-    //     this.ctx.fillText('client_smoothing/client_smooth : When updating players information from the server, it can smooth them out.', 10 , 210);
-    //     this.ctx.fillText(' This only applies to other clients when prediction is enabled, and applies to local player with no prediction.', 170 , 230);
-
-    // } //if this.show_help
-
-        //Draw some information for the host
+    //Draw some information for the host, so they know where their base is
     if(this.players.self.host) {
-
         this.ctx.fillStyle = 'rgba(255,255,255,0.7)';
         this.ctx.fillText('YOU', this.players.self.baseRow , this.players.baseColumn);
-
     } //if we are the host
 
 }; //game_core.client_draw_help
